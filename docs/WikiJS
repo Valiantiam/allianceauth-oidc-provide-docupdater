@@ -1,0 +1,79 @@
+## Application setup
+
+### The Big 4
+
+- Authorization: `https://your.url/o/authorize/`
+- Token: `https://your.url/o/token/`
+- Profile: `https://your.url/o/userinfo/`
+- Issuer `https://your.url/o`
+
+### Claims
+
+- `openid profile email`
+
+### Claim key mapping
+
+- `name` Eve Main Character Name ( Profile Grant? )
+- `email` Registered email on auth ( Email Grant )
+- `groups` List of all groups with the members state thrown in too ( Profile Grant )
+- `sub` PK of user model
+
+### WikiJS
+
+Manually create and groups you care for your users to have in the wiki and the service will map them for you. This greatly cuts down on group spam.
+in auth create `Administrators` to give access to the full wiki admin site.
+
+#### Administration > Authentication > Generic OpenID Connect / OAuth2
+
+- Skip User Profile `off`
+- Email claim `email`
+- Display Name Claim `name`
+- Map Groups `on`
+- Groups Claim `groups`
+- Allow Self Registration `on`
+
+### Grafana
+
+Tested only with access no group mapping as yet
+
+Group>Team mapping requires Grafana cloud or Enterprise and is outside of the scope of this doc.
+
+#### /etc/grafana/grafana.ini
+
+```ini
+[auth.generic_oauth]
+enabled = true
+name = Your Site Name
+allow_sign_up = true
+client_id = ******
+client_secret = *****
+scopes = openid,email,profile
+empty_scopes = false
+email_attribute_path = email
+name_attribute_path = name
+auth_url = https://your.url/o/authorize/
+token_url = https://your.url/o/token/
+api_url = https://your.url/o/userinfo/
+```
+
+### Debugging an application
+
+1.  Enable _Debug Mode_ for the specific application in the auth admin site.
+1.  then in your `gunicorn.log` look for long lines similar to this after you attempt to log in,
+
+```
+[01/Jan/2099 00:00:05] WARNING [allianceauth_oidc.signals:12] {"access_token": "abcdefghijklmnopqrstuvwxyz", "expires_in": 60, "token_type": "Bearer", "scope": "openid profile email", "refresh_token": "abcdefghijklmnopqrstuvwxyz", "id_token": "long ass string here"}
+```
+
+1.  take the `id_token` field and paste it into https://jwt.io/ to debug the data being sent to the application. it should be fairly self explanitory expect for these 2 fields.
+
+- `iss` is the issuer that must match exactly in the applications own settings.
+- `sub` is your user id if you need to debug why user is being sent.
+
+
+### Notes if Migrating from allianceauth-wiki-js
+There are a couple nuances to know about if you are migrating from allianceauth-wiki-js
+
+1. Make sure your auth methods are ordered with the new auth method on top.
+2. Under security, invalidate all sessions so that everyone has to re-auth.
+3. If you do not want to have to re-do permissions on your groups, re-name your existing groups so they are named with proper letter case and with spaces. The previous wiki-js service method did not name your groups with spaces and as such will not put your members in those groups until you rename them to match exactly as you have them named on alliance auth.
